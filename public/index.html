@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <link rel="stylesheet" href="assets/css/bootstrap.css">
+    <link rel="stylesheet" href="assets/css/custom.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-md navbar-dark fixed-top bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="#">Job Seeker Platform</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item"><a class="nav-link" href="#">Login</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<main>
+    <header class="jumbotron">
+        <div class="container text-center">
+            <h1 class="display-4">Job Seeker Platform</h1>
+        </div>
+    </header>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <form class="card card-default" id="login-form">
+                    <div class="card-header"><h4 class="mb-0">Login</h4></div>
+                    <div class="card-body">
+                        <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                        <div class="form-group row align-items-center">
+                            <div class="col-4 text-right">Nomor KTP</div>
+                            <div class="col-8"><input type="text" class="form-control" id="id_card_number" name="id_card_number"></div>
+                        </div>
+                        <div class="form-group row align-items-center">
+                            <div class="col-4 text-right">Kata Sandi</div>
+                            <div class="col-8"><input type="password" class="form-control" id="password" name="password"></div>
+                        </div>
+                        <div class="form-group row align-items-center mt-4">
+                            <div class="col-4"></div>
+                            <div class="col-8"><button type="submit" class="btn btn-primary">Login</button></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+<footer>
+    <div class="container">
+        <div class="text-center py-4 text-muted">Copyright © 2022 - Web Tech ID</div>
+    </div>
+</footer>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const loginForm = document.getElementById('login-form');
+        const errorMessageDiv = document.getElementById('error-message');
+        if (localStorage.getItem('authToken')) { window.location.href = '/dashboard/index.html'; return; }
+        loginForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            errorMessageDiv.style.display = 'none';
+            const idCardNumber = document.getElementById('id_card_number').value;
+            const password = document.getElementById('password').value;
+            if (idCardNumber.trim() === '' || password.trim() === '') {
+                errorMessageDiv.textContent = 'Nomor KTP dan Kata Sandi wajib diisi.';
+                errorMessageDiv.style.display = 'block';
+                return;
+            }
+            fetch('/api/v1/auth/login', { // <-- PERUBAHAN DI SINI
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ id_card_number: idCardNumber, password: password })
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Terjadi kesalahan pada server.' }));
+                    throw errorData;
+                }
+                return response.json();
+            })
+            .then(data => {
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('user', JSON.stringify(data));
+                alert('Login berhasil! Menampilkan dashboard...');
+                window.location.href = '/dashboard/index.html';
+            })
+            .catch(error => {
+                let displayMessage = 'Terjadi kesalahan. Silakan coba lagi.';
+                if (error && error.message) displayMessage = error.message;
+                else if (error && error.password) displayMessage = error.password[0];
+                else if (error && error.id_card_number) displayMessage = error.id_card_number[0];
+                errorMessageDiv.textContent = displayMessage;
+                errorMessageDiv.style.display = 'block';
+            });
+        });
+    });
+</script>
+</body>
+</html>

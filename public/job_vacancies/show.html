@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vacancy Detail</title>
+    <link rel="stylesheet" href="../assets/css/bootstrap.css">
+    <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-md navbar-dark fixed-top bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="../dashboard/index.html">Job Seeker Platform</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item"><a class="nav-link" href="#" id="user-name">Loading...</a></li>
+                <li class="nav-item"><a class="nav-link" href="#" id="logout-button">Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main>
+    <header class="jumbotron">
+        <div class="container">
+            <h1 id="company-name" class="display-4">Loading...</h1>
+            <p id="company-address" class="lead">Loading address...</p>
+        </div>
+    </header>
+    <div class="container">
+        <div class="card card-default">
+            <div class="card-body">
+                <h5 class="mb-3">Description</h5>
+                <p id="vacancy-description">Loading description...</p>
+                <hr>
+                <h5 class="mb-3">Select position</h5>
+                <form id="apply-form">
+                    <table class="table table-bordered align-middle">
+                        <thead class="thead-light"><tr><th></th><th>Position</th><th>Capacity</th><th>Application / Max</th></tr></thead>
+                        <tbody id="positions-table-body"></tbody>
+                    </table>
+                    <div class="form-group mt-4"><label for="notes">Notes for Company</label><textarea name="notes" id="notes" class="form-control" rows="5" placeholder="Explain why you should be accepted"></textarea></div>
+                    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary mt-3">Apply for this job</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer class="mt-5">
+    <div class="container">
+        <div class="text-center py-4 text-muted">Copyright © 2022 - Web Tech ID</div>
+    </div>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const authToken = localStorage.getItem('authToken');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!authToken) { window.location.href = '../index.html'; return; }
+    document.getElementById('user-name').textContent = user ? user.name : 'User';
+    document.getElementById('logout-button').addEventListener('click', (e) => { e.preventDefault(); localStorage.clear(); window.location.href = '../index.html'; });
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const vacancyId = urlParams.get('id');
+    if (!vacancyId) { alert('Vacancy ID not found!'); window.location.href = 'index.html'; return; }
+
+    const applyForm = document.getElementById('apply-form');
+    const errorMessageDiv = document.getElementById('error-message');
+
+    fetch(`/api/v1/job_vacancies/${vacancyId}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+        const vacancy = data.vacancy;
+        document.getElementById('company-name').textContent = vacancy.company;
+        document.getElementById('company-address').textContent = vacancy.address;
+        document.getElementById('vacancy-description').textContent = vacancy.description;
+        const tableBody = document.getElementById('positions-table-body');
+        let positionsHTML = '<tr><td colspan="4">No positions available.</td></tr>';
+        if (vacancy.available_positions && vacancy.available_positions.length > 0) {
+            positionsHTML = vacancy.available_positions.map(pos => {
+                const isFull = pos.apply_count >= pos.capacity;
+                return `<tr><td class="text-center"><input type="checkbox" name="positions[]" value="${pos.id}" ${isFull ? 'disabled' : ''}></td><td>${pos.position}</td><td>${pos.capacity}</td><td>${pos.apply_count} / ${pos.capacity}</td></tr>`;
+            }).join('');
+        }
+        tableBody.innerHTML = positionsHTML;
+    })
+    .catch(error => console.error(error));
+
+    applyForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        errorMessageDiv.style.display = 'none';
+        const checkedPositions = document.querySelectorAll('input[name="positions[]"]:checked');
+        const positions = Array.from(checkedPositions).map(cb => cb.value);
+        if (positions.length === 0) {
+            errorMessageDiv.textContent = 'You must select at least one position.';
+            errorMessageDiv.style.display = 'block';
+            return;
+        }
+        const submissionData = { vacancy_id: vacancyId, positions: positions, notes: document.getElementById('notes').value };
+
+        fetch('/api/v1/applications', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(submissionData)
+        })
+        .then(async response => {
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw errorData;
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert(data.message);
+            window.location.href = 'index.html';
+        })
+        .catch(error => {
+            let message = error.message || 'An error occurred. Please try again.';
+            if (error.errors) message = Object.values(error.errors)[0][0];
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.style.display = 'block';
+        });
+    });
+});
+</script>
+
+</body>
+</html>

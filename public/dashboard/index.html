@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="../assets/css/bootstrap.css">
+    <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-md navbar-dark fixed-top bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/dashboard/index.html">Job Seeker Platform</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item"><a class="nav-link" href="#" id="user-name">Loading...</a></li>
+                <li class="nav-item"><a class="nav-link" href="#" id="logout-button">Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<main>
+    <header class="jumbotron"><div class="container"><h1 class="display-4">Dashboard</h1></div></header>
+    <div class="container">
+        <div class="section-header mb-4"><h4 class="section-title">My Data Validation</h4></div>
+        <div id="data-validation-container"><p>Loading data validation...</p></div>
+        <div class="section-header mt-5 mb-4"><h4 class="section-title">My Job Applications</h4></div>
+        <div id="application-notification"></div>
+        <div id="add-application-button-container" class="mb-3"></div>
+        <div id="job-applications-container"><p>Loading job applications...</p></div>
+    </div>
+</main>
+<footer><div class="container"><div class="text-center py-4 text-muted">Copyright © 2022 - Web Tech ID</div></div></footer>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const authToken = localStorage.getItem('authToken');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!authToken) { window.location.href = '/index.html'; return; }
+    document.getElementById('user-name').textContent = user ? user.name : 'User';
+    document.getElementById('logout-button').addEventListener('click', function(e) {
+        e.preventDefault();
+        fetch('/api/v1/auth/logout', { // <-- PERUBAHAN DI SINI
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        })
+        .finally(() => { localStorage.clear(); alert('Logout successful!'); window.location.href = '/index.html'; });
+    });
+    const validationContainer = document.getElementById('data-validation-container');
+    const applicationNotification = document.getElementById('application-notification');
+    const addApplicationButtonContainer = document.getElementById('add-application-button-container');
+    fetch('/api/v1/validation', { headers: { 'Authorization': `Bearer ${authToken}` } }) // <-- PERUBAHAN DI SINI
+    .then(res => res.json())
+    .then(data => {
+        if (!data.validation) {
+            validationContainer.innerHTML = `<div class="card card-default"><div class="card-body">You have not requested data validation. <a href="/data_validation/create.html" class="btn btn-primary btn-sm ml-2">+ Request validation</a></div></div>`;
+            applicationNotification.innerHTML = `<div class="alert alert-warning">Your validation must be approved by validator to applying job.</div>`;
+        } else {
+            const v = data.validation;
+            let statusBadge = (v.status === 'pending') ? `<span class="badge badge-primary">Pending</span>` : (v.status === 'accepted' ? `<span class="badge badge-success">Accepted</span>` : `<span class="badge badge-danger">Declined</span>`);
+            validationContainer.innerHTML = `<div class="card card-default"><div class="card-body"><table class="table table-bordered"><tr><th>Status</th><td>${statusBadge}</td></tr><tr><th>Job Category</th><td>${v.job_category ? v.job_category.job_category : '-'}</td></tr><tr><th>Job Position</th><td>${v.job_position || '-'}</td></tr><tr><th>Reason Accepted</th><td>${v.reason_accepted || '-'}</td></tr><tr><th>Validator</th><td>${v.validator ? v.validator.name : '-'}</td></tr><tr><th>Validator Notes</th><td>${v.validator_notes || '-'}</td></tr></table></div></div>`;
+            if (v.status === 'accepted') addApplicationButtonContainer.innerHTML = `<a href="/job_vacancies/index.html" class="btn btn-primary">+ Add Job Applications</a>`;
+            else applicationNotification.innerHTML = `<div class="alert alert-warning">Your validation must be approved by validator to applying job.</div>`;
+        }
+    });
+    const applicationsContainer = document.getElementById('job-applications-container');
+    fetch('/api/v1/applications', { headers: { 'Authorization': `Bearer ${authToken}` } }) // <-- PERUBAHAN DI SINI
+    .then(res => res.json())
+    .then(data => {
+        if (!data.applications || data.applications.length === 0) {
+            applicationsContainer.innerHTML = `<div class="alert alert-info">You have no job applications yet.</div>`; return;
+        }
+        let applicationsHTML = '';
+        data.applications.forEach(app => {
+            let positionsHTML = '<ul class="list-unstyled">';
+            if (app.applied_positions && app.applied_positions.length > 0) {
+                app.applied_positions.forEach(pos => {
+                    let statusBadge = (pos.status === 'pending') ? `<span class="badge badge-primary">Pending</span>` : (pos.status === 'accepted' ? `<span class="badge badge-success">Accepted</span>` : `<span class="badge badge-danger">Rejected</span>`);
+                    positionsHTML += `<li>${pos.position ? pos.position.position : 'Unknown Position'} ${statusBadge}</li>`;
+                });
+            } else { positionsHTML += '<li>No specific positions applied for.</li>'; }
+            positionsHTML += '</ul>';
+            applicationsHTML += `<div class="card card-default mb-3"><div class="card-body"><div class="row"><div class="col-md-8"><h5>${app.job_vacancy ? app.job_vacancy.company : 'Unknown Company'}</h5><p>${app.job_vacancy ? app.job_vacancy.address : '-'}</p></div><div class="col-md-4 text-md-right"><small>Apply Date: ${app.date}</small></div></div><hr><div class="row"><div class="col-md-6"><strong>Position:</strong>${positionsHTML}</div><div class="col-md-6"><strong>Notes:</strong><p>${app.notes || '-'}</p></div></div></div></div>`;
+        });
+        applicationsContainer.innerHTML = applicationsHTML;
+    });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Request Data Validation</title>
+    <link rel="stylesheet" href="../assets/css/bootstrap.css">
+    <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-md navbar-dark fixed-top bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/dashboard/index.html">Job Seeker Platform</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item"><a class="nav-link" href="#" id="user-name">Loading...</a></li>
+                <li class="nav-item"><a class="nav-link" href="#" id="logout-button">Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<main>
+    <header class="jumbotron">
+        <div class="container"><h1 class="display-4">Request Data Validation</h1></div>
+    </header>
+    <div class="container">
+        <form id="validation-form">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group"><label for="job_category">Job Category</label><select name="job_category_id" id="job_category" class="form-control" required><option value="">-- Choose Job Category --</option></select></div>
+                    <div class="form-group"><label for="job_position">Job position sparate with , (comma)</label><textarea name="job_position" id="job_position" cols="30" rows="5" class="form-control" required></textarea></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group"><label for="work_experience_select">Work Experiences ?</label><select id="work_experience_select" class="form-control"><option value="Yes, I have">Yes, I have</option><option value="No">No</option></select></div>
+                    <div class="form-group"><label for="work_experience">Describe your work experiences</label><textarea name="work_experience" id="work_experience" cols="30" rows="5" class="form-control" required></textarea></div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="form-group"><label for="reason_accepted">Reason Accepted</label><textarea name="reason_accepted" id="reason_accepted" cols="30" rows="5" class="form-control" placeholder="Explain why you should be accepted" required></textarea></div>
+                </div>
+            </div>
+            <div id="error-message" class="alert alert-danger mt-3" style="display: none;"></div>
+            <button type="submit" class="btn btn-primary mt-3">Send Request</button>
+        </form>
+    </div>
+</main>
+<footer class="mt-5"><div class="container"><div class="text-center py-4 text-muted">Copyright © 2022 - Web Tech ID</div></div></footer>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const authToken = localStorage.getItem('authToken');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!authToken) { window.location.href = '/index.html'; return; }
+    document.getElementById('user-name').textContent = user ? user.name : 'User';
+    document.getElementById('logout-button').addEventListener('click', (e) => { e.preventDefault(); localStorage.clear(); window.location.href = '/index.html'; });
+
+    const jobCategorySelect = document.getElementById('job_category');
+    const validationForm = document.getElementById('validation-form');
+    const errorMessageDiv = document.getElementById('error-message');
+
+    fetch('/api/v1/job_categories', { headers: { 'Authorization': `Bearer ${authToken}` } }) // <-- PERUBAHAN DI SINI
+    .then(res => res.json())
+    .then(data => {
+        data.categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.job_category;
+            jobCategorySelect.appendChild(option);
+        });
+    });
+    validationForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        errorMessageDiv.style.display = 'none';
+        const formData = new FormData(validationForm);
+        const data = Object.fromEntries(formData.entries());
+        fetch('/api/v1/validation', { // <-- PERUBAHAN DI SINI
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(async response => {
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'An error occurred.' }));
+                throw errorData;
+            }
+            return response.json();
+        })
+        .then(data => { alert(data.message); window.location.href = '/dashboard/index.html'; })
+        .catch(error => {
+            let message = error.message || 'An error occurred.';
+            if (error.errors) message = Object.values(error.errors)[0][0];
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.style.display = 'block';
+        });
+    });
+});
+</script>
+</body>
+</html>

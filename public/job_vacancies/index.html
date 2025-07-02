@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Job Vacancies</title>
+    <link rel="stylesheet" href="../assets/css/bootstrap.css">
+    <link rel="stylesheet" href="../assets/css/custom.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-md navbar-dark fixed-top bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="/dashboard/index.html">Job Seeker Platform</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item"><a class="nav-link" href="#" id="user-name">Loading...</a></li>
+                <li class="nav-item"><a class="nav-link" href="#" id="logout-button">Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<main>
+    <header class="jumbotron"><div class="container"><h1 class="display-4">Job Vacancies</h1></div></header>
+    <div class="container">
+        <div class="section-header mb-4"><h4 class="section-title">List of Job Vacancies</h4></div>
+        <div id="vacancies-container"><p>Loading vacancies...</p></div>
+    </div>
+</main>
+<footer class="mt-5"><div class="container"><div class="text-center py-4 text-muted">Copyright © 2022 - Web Tech ID</div></div></footer>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const authToken = localStorage.getItem('authToken');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!authToken) { window.location.href = '/index.html'; return; }
+    document.getElementById('user-name').textContent = user ? user.name : 'User';
+    document.getElementById('logout-button').addEventListener('click', (e) => {
+        e.preventDefault();
+        fetch('/api/v1/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${authToken}` } })
+        .finally(() => { localStorage.clear(); window.location.href = '/index.html'; });
+    });
+    const vacanciesContainer = document.getElementById('vacancies-container');
+    fetch('/api/v1/job_vacancies', { headers: { 'Authorization': `Bearer ${authToken}` } }) // <-- PERUBAHAN DI SINI
+    .then(async response => {
+        if (!response.ok) { const errorData = await response.json().catch(() => ({})); throw errorData; }
+        return response.json();
+    })
+    .then(data => {
+        if (!data.vacancies || data.vacancies.length === 0) {
+            vacanciesContainer.innerHTML = `<div class="alert alert-info">No job vacancies available at the moment.</div>`; return;
+        }
+        let vacanciesHTML = '';
+        data.vacancies.forEach(vacancy => {
+            let positionsHTML = 'No positions listed.';
+            if (vacancy.available_positions && vacancy.available_positions.length > 0) {
+                positionsHTML = vacancy.available_positions.map(p => `${p.position} (${p.capacity})`).join(', ');
+            }
+            const buttonHTML = vacancy.has_applied ? `<button class="btn btn-success" disabled>Vacancies has been submitted</button>` : `<a href="/job_vacancies/show.html?id=${vacancy.id}" class="btn btn-danger">Detail / Apply</a>`;
+            vacanciesHTML += `<div class="card card-default mb-3"><div class="card-body"><div class="row"><div class="col-md-8"><h5 class="mb-1">${vacancy.company}</h5><small class="d-block text-muted">${vacancy.address}</small></div><div class="col-md-4 text-md-right">${buttonHTML}</div></div><hr class="my-3"><div><strong>Available Position (Capacity):</strong><p class="mb-0">${positionsHTML}</p></div></div></div>`;
+        });
+        vacanciesContainer.innerHTML = vacanciesHTML;
+    })
+    .catch(error => {
+        let message = error.message || "Failed to load job vacancies.";
+        vacanciesContainer.innerHTML = `<div class="alert alert-danger">${message}</div>`;
+    });
+});
+</script>
+</body>
+</html>
